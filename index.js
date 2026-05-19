@@ -29,14 +29,14 @@ const KUZENLER = [
 // Aynı maçı tekrar raporlamamak için hafıza
 let sonKontrolEdilenMaclar = new Set();
 
-// 📊 HAFTALIK LİG TABLOSU HAFIZASI
+// 📊 HAFTALIK LİG TABLOSU HAFIZASI (Wins eklendi abi)
 let haftalikVeriler = {};
 KUZENLER.forEach(k => {
-    haftalikVeriler[k.discordId] = { name: k.name, kills: 0, assists: 0, roadKills: 0, revives: 0, heals: 0, macSayisi: 0 };
+    haftalikVeriler[k.discordId] = { name: k.name, kills: 0, assists: 0, wins: 0, roadKills: 0, revives: 0, heals: 0, macSayisi: 0 };
 });
 
 client.once('ready', () => {
-    console.log(`${client.user.tag} aktif! Asist ve Haftalık tablo sistemi devrede.`);
+    console.log(`${client.user.tag} aktif! Birincilik sayacı ve haftalık lig devrede.`);
     
     // Her 5 dakikada bir maçları kontrol et
     setInterval(maclariKontrolEt, 5 * 60 * 1000);
@@ -84,7 +84,7 @@ async function maclariKontrolEt() {
                         discordId: kuzen.discordId,
                         discordTag: `<@${kuzen.discordId}>`,
                         kills: stats.kills,
-                        assists: stats.assists, // Asist verisini PUBG'den çekiyoruz abi
+                        assists: stats.assists,
                         headshots: stats.headshotKills,
                         damage: Math.round(stats.damageDealt),
                         revives: stats.revives,
@@ -103,19 +103,40 @@ async function maclariKontrolEt() {
             if (mactakiKuzenSayisi >= 2) {
                 sonKontrolEdilenMaclar.add(sonMacId);
                 
+                // 🍗 Maçın genel sıralamasını (WinPlace) PUBG verisinden kontrol ediyoruz abi
+                let winDurumu = false;
+                try {
+                    const ilkKuzenPubgName = KUZENLER.find(k => k.discordId === macOzeti[0].discordId)?.pubgName.toLowerCase();
+                    const rosterList = matchResponse.data.included.filter(x => x.type === 'roster');
+                    const bizimTakim = rosterList.find(r => 
+                        r.relationships.participants.data.some(p => {
+                            const participantData = matchResponse.data.included.find(i => i.id === p.id);
+                            return participantData?.attributes.stats.name.toLowerCase() === ilkKuzenPubgName;
+                        })
+                    );
+                    if (bizimTakim && bizimTakim.attributes.stats.rank === 1) {
+                        winDurumu = true;
+                    }
+                } catch (e) {
+                    console.log("Sıralama kontrolünde ufak pürüz.");
+                }
+
                 // Haftalık istatistikleri dolduruyoruz abi
                 macOzeti.forEach(k => {
                     if (haftalikVeriler[k.discordId]) {
                         haftalikVeriler[k.discordId].kills += k.kills;
-                        haftalikVeriler[k.discordId].assists += k.assists; // Haftalık asiste ekle
+                        haftalikVeriler[k.discordId].assists += k.assists;
                         haftalikVeriler[k.discordId].roadKills += k.roadKills;
                         haftalikVeriler[k.discordId].revives += k.revives;
                         haftalikVeriler[k.discordId].heals += k.heals;
                         haftalikVeriler[k.discordId].macSayisi += 1;
+                        if (winDurumu) {
+                            haftalikVeriler[k.discordId].wins += 1; // Şampiyon olunduysa haftalık galibiyete ekle abi!
+                        }
                     }
                 });
 
-                await disordaRaporLa(macOzeti, ilkKanFeda);
+                await disordaRaporLa(macOzeti, ilkKan, winDurumu);
                 break; 
             } else if (mactakiKuzenSayisi == 1) {
                 sonKontrolEdilenMaclar.add(sonMacId);
@@ -127,7 +148,7 @@ async function maclariKontrolEt() {
     }
 }
 
-async function disordaRaporLa(ozetler, ilkKan) {
+async function disordaRaporLa(ozetler, ilkKan, winDurumu) {
     const kanal = client.channels.cache.get(DISCORD_KANAL_ID);
     if (!kanal) return;
 
@@ -135,12 +156,19 @@ async function disordaRaporLa(ozetler, ilkKan) {
     const macinAgasi = ozetler[0];
 
     const embed = new EmbedBuilder()
-        .setTitle('🍗 KUZENLER SQUAD - MAÇ SONU RAPORU')
-        .setDescription('Ekip yine beraber mermileri konuşturmuş, dedektör raporu hazırladı abi!')
-        .setColor('#ffaa00')
         .setTimestamp();
 
-    // Maçın ağasına asisti de ekledik
+    // 🏆 Eğer 1. olduysanız yeşil alevli şampiyonluk teması, normal maçsa turuncu
+    if (winDurumu) {
+        embed.setTitle('🍗 WINNER WINNER CHICKEN DINNER! 🏆')
+             .setDescription('**KUZENLER LİGİNDE BÜYÜK ŞENLİK! Ekip çorba parasını çıkardı, maçı 1. BİTİRDİ!** 🥳🔥')
+             .setColor('#00ff44');
+    } else {
+        embed.setTitle('🍗 KUZENLER SQUAD - MAÇ SONU RAPORU')
+             .setDescription('Ekip yine beraber mermileri konuşturmuş, dedektör raporu hazırladı abi!')
+             .setColor('#ffaa00');
+    }
+
     embed.addFields({ 
         name: '👑 MAÇIN AĞASI (TOP 1)', 
         value: `${macinAgasi.discordTag} -> **${macinAgasi.kills} Kill** (${macinAgasi.assists} Asist) | **Damage:** ${macinAgasi.damage}` 
@@ -158,7 +186,6 @@ async function disordaRaporLa(ozetler, ilkKan) {
 
     let ifsaMetni = '';
     
-    // Gizli emekçiyi ifşa etme (0 veya az kill alıp çok asist yapan)
     const asistan = ozetler.sort((a,b) => b.assists - a.assists)[0];
     if (asistan && asistan.assists > 0) ifsaMetni += `🤝 **Hakkı Yenen Emekçi:** ${asistan.discordTag} bu maç tam ${asistan.assists} asist yaparak takımın gizli kahramanı oldu!\n`;
 
@@ -171,7 +198,7 @@ async function disordaRaporLa(ozetler, ilkKan) {
     const kurtarici = ozetler.find(x => x.revives > 0);
     if (kurtarici) ifsaMetni += `🏥 **Hızır Acil:** ${kurtarici.discordTag} yerde sürünen kuzenini ${kurtarici.revives} kere kaldırdı!\n`;
 
-    if (ilkKan.name !== 'Bilinmiyor') {
+    if (ilkKan.name !== 'Bilinmiyor' && !winDurumu) {
         ifsaMetni += `💀 **İlk Kan:** ${ilkKan.name} silah bulamadan erkenden lobiye döndü.\n`;
     }
 
@@ -198,7 +225,7 @@ async function haftalikRaporKontrol() {
 
         const embed = new EmbedBuilder()
             .setTitle('🏆 KUZENLER LİGİ HAFTALIK BÜYÜK RAPORU')
-            .setDescription('Hafta boyunca oynanan tüm ortak maçlar toplandı ve haftanın ağası seçildi abi!')
+            .setDescription('Hafta boyunca oynanan tüm ortak maçlar toplandı ve bilançolar hazırlandı abi!')
             .setColor('#00ff44')
             .setTimestamp();
 
@@ -209,15 +236,15 @@ async function haftalikRaporKontrol() {
             });
         }
 
+        // 📊 Genel lig tablosunda artık kazanılan birincilik (WINS) sayısı da yazıyor abi!
         let siralamaMetni = '';
         siraliLig.forEach((k, index) => {
-            siralamaMetni += `**${index + 1}.** <@${k.id}> -> **${k.kills} Kill** (${k.assists} Asist) | ${k.macSayisi} Maç\n`;
+            siralamaMetni += `**${index + 1}.** <@${k.id}> -> **${k.kills} Kill** (${k.assists} Asist) | 🏆 **${k.wins} Çorba (Galibiyet)** | ${k.macSayisi} Maç\n`;
         });
         embed.addFields({ name: '📊 HAFTALIK GENEL SKOR TABLOSU', value: siralamaMetni });
 
         let haftalikIfsa = '';
         
-        // Haftalık asist kralı
         const haftalikAsistKrali = siraliLig.sort((a,b) => b.assists - a.assists)[0];
         if (haftalikAsistKrali && haftalikAsistKrali.assists > 0) haftalikIfsa += `🤝 **Haftanın Yancısı / Asist Kralı:** <@${haftalikAsistKrali.id}> (Hafta boyunca tam ${haftalikAsistKrali.assists} kill çaldırdı!)\n`;
 
@@ -233,8 +260,9 @@ async function haftalikRaporKontrol() {
 
         await kanal.send({ embeds: [embed] });
 
+        // Verileri yeni hafta için sıfırla
         KUZENLER.forEach(k => {
-            haftalikVeriler[k.discordId] = { name: k.name, kills: 0, assists: 0, roadKills: 0, revives: 0, heals: 0, macSayisi: 0 };
+            haftalikVeriler[k.discordId] = { name: k.name, kills: 0, assists: 0, wins: 0, roadKills: 0, revives: 0, heals: 0, macSayisi: 0 };
         });
     }
 }

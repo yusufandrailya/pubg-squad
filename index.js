@@ -16,27 +16,30 @@ const client = new Client({
 });
 
 // --- AYARLAR ---
-const DISCORD_KANAL_ID = '1506337976219602954'; // Maç özetlerinin düşeceği kanal ID'si
+const DISCORD_KANAL_ID = 'KANAL_ID_YAZ'; // Maç özetlerinin düşeceği kanal ID'si
 
-// :trophy: KUZENLER SQUAD - Toplam 4 Kişilik Güncel Kadro
+// 🏆 KUZENLER SQUAD - Toplam 4 Kişilik Kadro
 const KUZENLER = [
-    { name: 'Yusuf', pubgName: 'NEPTUNELINES', discordId: '1348465377755267164' },
-    { name: 'Mustafa', pubgName: 'M500CK', discordId: '1000041385652654201' },
-    { name: 'Barat', pubgName: 'yt-TekneciBarat', discordId: '935270508985983056' },
-    { name: 'Borax', pubgName: 'etli_KREP', discordId: '991049606722912327' }
+    { name: 'Yusuf', pubgName: 'PUBG_NICK_1', discordId: 'DISCORD_ID_1' },
+    { name: 'Mustafa', pubgName: 'NEPTUNELINES', discordId: 'DISCORD_ID_2' },
+    { name: 'Berat', pubgName: 'yt-TekneciBarat', discordId: 'DISCORD_ID_3' },
+    { name: 'Borax', pubgName: 'etli_KREP', discordId: 'DISCORD_ID_4' }
 ];
 
 // Aynı maçı tekrar raporlamamak için hafıza
 let sonKontrolEdilenMaclar = new Set();
 
-// 📊 HAFTALIK LİG TABLOSU HAFIZASI (Wins eklendi abi)
+// 📊 HAFTALIK LİG TABLOSU HAFIZASI
 let haftalikVeriler = {};
 KUZENLER.forEach(k => {
     haftalikVeriler[k.discordId] = { name: k.name, kills: 0, assists: 0, wins: 0, roadKills: 0, revives: 0, heals: 0, macSayisi: 0 };
 });
 
+// 🏆 Ekibin hafta boyunca toplam ortak şampiyonluk sayısı hafızası abi
+let ekibinToplamGalibiyeti = 0;
+
 client.once('ready', () => {
-    console.log(`${client.user.tag} aktif! Birincilik sayacı ve haftalık lig devrede.`);
+    console.log(`${client.user.tag} aktif! Ekip toplam galibiyet sayacı devrede.`);
     
     // Her 5 dakikada bir maçları kontrol et
     setInterval(maclariKontrolEt, 5 * 60 * 1000);
@@ -99,11 +102,9 @@ async function maclariKontrolEt() {
                 }
             }
 
-            // Eğer maçta en az 2 kuzen varsa raporla ve HAFTALIK HAFIZAYA EKLE
             if (mactakiKuzenSayisi >= 2) {
                 sonKontrolEdilenMaclar.add(sonMacId);
                 
-                // 🍗 Maçın genel sıralamasını (WinPlace) PUBG verisinden kontrol ediyoruz abi
                 let winDurumu = false;
                 try {
                     const ilkKuzenPubgName = KUZENLER.find(k => k.discordId === macOzeti[0].discordId)?.pubgName.toLowerCase();
@@ -121,7 +122,11 @@ async function maclariKontrolEt() {
                     console.log("Sıralama kontrolünde ufak pürüz.");
                 }
 
-                // Haftalık istatistikleri dolduruyoruz abi
+                // Eğer ekip ortak maçı 1. bitirdiyse ekibin toplam sayacını 1 arttır abi
+                if (winDurumu) {
+                    ekibinToplamGalibiyeti += 1;
+                }
+
                 macOzeti.forEach(k => {
                     if (haftalikVeriler[k.discordId]) {
                         haftalikVeriler[k.discordId].kills += k.kills;
@@ -131,7 +136,7 @@ async function maclariKontrolEt() {
                         haftalikVeriler[k.discordId].heals += k.heals;
                         haftalikVeriler[k.discordId].macSayisi += 1;
                         if (winDurumu) {
-                            haftalikVeriler[k.discordId].wins += 1; // Şampiyon olunduysa haftalık galibiyete ekle abi!
+                            haftalikVeriler[k.discordId].wins += 1;
                         }
                     }
                 });
@@ -158,7 +163,6 @@ async function disordaRaporLa(ozetler, ilkKan, winDurumu) {
     const embed = new EmbedBuilder()
         .setTimestamp();
 
-    // 🏆 Eğer 1. olduysanız yeşil alevli şampiyonluk teması, normal maçsa turuncu
     if (winDurumu) {
         embed.setTitle('🍗 WINNER WINNER CHICKEN DINNER! 🏆')
              .setDescription('**KUZENLER LİGİNDE BÜYÜK ŞENLİK! Ekip çorba parasını çıkardı, maçı 1. BİTİRDİ!** 🥳🔥')
@@ -225,9 +229,11 @@ async function haftalikRaporKontrol() {
 
         const embed = new EmbedBuilder()
             .setTitle('🏆 KUZENLER LİGİ HAFTALIK BÜYÜK RAPORU')
-            .setDescription('Hafta boyunca oynanan tüm ortak maçlar toplandı ve bilançolar hazırlandı abi!')
             .setColor('#00ff44')
             .setTimestamp();
+
+        // 🔥 Ekibin haftalık toplam şampiyonluk sayısını en başa fiyakalı bir şekilde ekledik abi!
+        embed.setDescription(`**Hafta boyunca oynanan tüm ortak maçlar toplandı abi!**\n\n🎯 **EKİBİN HAFTALIK TOPLAM ÇORBA SAYISI:** Tam **${ekibinToplamGalibiyeti} Kez** 1. Olundu! 🎉`);
 
         if (haftaninAgasi && haftaninAgasi.kills > 0) {
             embed.addFields({
@@ -236,10 +242,9 @@ async function haftalikRaporKontrol() {
             });
         }
 
-        // 📊 Genel lig tablosunda artık kazanılan birincilik (WINS) sayısı da yazıyor abi!
         let siralamaMetni = '';
         siraliLig.forEach((k, index) => {
-            siralamaMetni += `**${index + 1}.** <@${k.id}> -> **${k.kills} Kill** (${k.assists} Asist) | 🏆 **${k.wins} Çorba (Galibiyet)** | ${k.macSayisi} Maç\n`;
+            siralamaMetni += `**${index + 1}.** <@${k.id}> -> **${k.kills} Kill** (${k.assists} Asist) | 🏆 **${k.wins} Çorba** | ${k.macSayisi} Maç\n`;
         });
         embed.addFields({ name: '📊 HAFTALIK GENEL SKOR TABLOSU', value: siralamaMetni });
 
@@ -260,7 +265,8 @@ async function haftalikRaporKontrol() {
 
         await kanal.send({ embeds: [embed] });
 
-        // Verileri yeni hafta için sıfırla
+        // Verileri ve ekip toplam sayacını yeni hafta için sıfırla abi
+        ekibinToplamGalibiyeti = 0;
         KUZENLER.forEach(k => {
             haftalikVeriler[k.discordId] = { name: k.name, kills: 0, assists: 0, wins: 0, roadKills: 0, revives: 0, heals: 0, macSayisi: 0 };
         });

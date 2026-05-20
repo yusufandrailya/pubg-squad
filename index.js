@@ -16,14 +16,14 @@ const client = new Client({
 });
 
 // --- AYARLAR ---
-const DISCORD_KANAL_ID = 'KANAL_ID_YAZ'; // Maç özetlerinin düşeceği kanal ID'si
+const DISCORD_KANAL_ID = '1506337976219602954'; // Maç özetlerinin düşeceği kanal ID'si
 
-// 🏆 KUZENLER SQUAD - Toplam 4 Kişilik Kadro
+// :trophy: KUZENLER SQUAD - Toplam 4 Kişilik Güncel Kadro
 const KUZENLER = [
-    { name: 'Yusuf', pubgName: 'PUBG_NICK_1', discordId: 'DISCORD_ID_1' },
-    { name: 'Mustafa', pubgName: 'NEPTUNELINES', discordId: 'DISCORD_ID_2' },
-    { name: 'Berat', pubgName: 'yt-TekneciBarat', discordId: 'DISCORD_ID_3' },
-    { name: 'Borax', pubgName: 'etli_KREP', discordId: 'DISCORD_ID_4' }
+    { name: 'Yusuf', pubgName: 'NEPTUNELINES', discordId: '1348465377755267164' },
+    { name: 'Mustafa', pubgName: 'M500CK', discordId: '1000041385652654201' },
+    { name: 'Barat', pubgName: 'yt-TekneciBarat', discordId: '935270508985983056' },
+    { name: 'Borax', pubgName: 'etli_KREP', discordId: '991049606722912327' }
 ];
 
 // Aynı maçı tekrar raporlamamak için hafıza
